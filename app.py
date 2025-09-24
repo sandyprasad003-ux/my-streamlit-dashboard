@@ -6,8 +6,6 @@ import plotly.express as px
 st.set_page_config(page_title="One-Screen Dashboard", layout="wide")
 st.title("One-Screen Dashboard (Excel → interactive)")
 
-MAX_UNIQUE = 100  # max unique values per dropdown
-
 # --- Cached file reading ---
 @st.cache_data
 def read_file(file_path):
@@ -19,6 +17,10 @@ def read_file(file_path):
 # --- Fixed Excel file path ---
 file_path = "ALL_DIVISION_DATA_1ST_SEP_24TH_SEP_25_CBO.xlsx"
 df = read_file(file_path)
+
+# Strip spaces from string columns
+for col in df.select_dtypes(include=["object"]):
+    df[col] = df[col].astype(str).str.strip()
 
 # Convert object columns to datetime if possible
 for col in df.columns:
@@ -33,21 +35,21 @@ st.sidebar.header("Filters (Dropdowns)")
 filter_values = {}
 for col in df.columns:
     if pd.api.types.is_datetime64_any_dtype(df[col]):
-        options = sorted(df[col].dt.strftime('%Y-%m-%d').unique())[:MAX_UNIQUE]
+        options = sorted(df[col].dt.strftime('%Y-%m-%d').unique())
         options = ["ALL"] + options
         selected = st.sidebar.multiselect(f"{col}", options, default=["ALL"])
         if "ALL" not in selected:
             selected = pd.to_datetime(selected)
         else:
-            selected = None  # No filtering if ALL
+            selected = None
     else:
-        options = sorted(df[col].dropna().unique())[:MAX_UNIQUE]
+        options = sorted(df[col].dropna().unique())
         options = ["ALL"] + options
         selected = st.sidebar.multiselect(f"{col}", options, default=["ALL"])
         if "ALL" not in selected:
             selected = selected
         else:
-            selected = None  # No filtering if ALL
+            selected = None
     filter_values[col] = selected
 
 # Apply filters to get filtered dataframe
