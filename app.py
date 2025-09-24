@@ -7,7 +7,6 @@ st.set_page_config(page_title="One-Screen Dashboard", layout="wide")
 st.title("One-Screen Dashboard (Excel → interactive)")
 
 MAX_UNIQUE = 100  # max unique values per dropdown
-MAX_DISPLAY_ROWS = 1000  # max rows displayed in table
 
 # --- Cached file reading ---
 @st.cache_data
@@ -35,12 +34,12 @@ filter_values = {}
 for col in df.columns:
     if pd.api.types.is_datetime64_any_dtype(df[col]):
         options = sorted(df[col].dt.strftime('%Y-%m-%d').unique())[:MAX_UNIQUE]
-        options = ["ALL"] + options  # add ALL at the top
+        options = ["ALL"] + options
         selected = st.sidebar.multiselect(f"{col}", options, default=["ALL"])
         if "ALL" not in selected:
             selected = pd.to_datetime(selected)
         else:
-            selected = df[col]
+            selected = None  # No filtering if ALL
     else:
         options = sorted(df[col].dropna().unique())[:MAX_UNIQUE]
         options = ["ALL"] + options
@@ -48,13 +47,14 @@ for col in df.columns:
         if "ALL" not in selected:
             selected = selected
         else:
-            selected = df[col]
+            selected = None  # No filtering if ALL
     filter_values[col] = selected
 
 # Apply filters to get filtered dataframe
 filtered_df = df.copy()
 for col, selected in filter_values.items():
-    filtered_df = filtered_df[filtered_df[col].isin(selected)]
+    if selected is not None:
+        filtered_df = filtered_df[filtered_df[col].isin(selected)]
 
 # --- KPIs ---
 numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
@@ -82,11 +82,9 @@ if group_col and value_col:
 else:
     st.info("Select a group and numeric value in the sidebar to see a chart.")
 
-# --- Table and download ---
-st.subheader(f"Data (filtered) - Showing up to {MAX_DISPLAY_ROWS} rows")
-st.dataframe(filtered_df.head(MAX_DISPLAY_ROWS), use_container_width=True)
-if len(filtered_df) > MAX_DISPLAY_ROWS:
-    st.write(f"... {len(filtered_df) - MAX_DISPLAY_ROWS} more rows not displayed for performance.")
+# --- Table and download (show all rows) ---
+st.subheader("Data (filtered) - All rows from Excel")
+st.dataframe(filtered_df, use_container_width=True)
 
 csv = filtered_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download filtered data as CSV", csv, "filtered.csv", "text/csv")
