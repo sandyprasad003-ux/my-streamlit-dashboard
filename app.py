@@ -9,6 +9,7 @@ st.title("One-Screen Dashboard (Excel → interactive)")
 # --- Cached file reading ---
 @st.cache_data
 def read_file(file_path):
+    """Read Excel or CSV file."""
     if file_path.endswith(("xlsx", "xls")):
         return pd.read_excel(file_path, engine="openpyxl")
     else:
@@ -52,7 +53,7 @@ for col in df.columns:
             selected = None
     filter_values[col] = selected
 
-# Apply filters to get filtered dataframe
+# Apply filters
 filtered_df = df.copy()
 for col, selected in filter_values.items():
     if selected is not None:
@@ -90,4 +91,4 @@ st.dataframe(filtered_df, use_container_width=True)
 
 csv = filtered_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download filtered data as CSV", csv, "filtered.csv", "text/csv")
-# small change for redeploy
+
