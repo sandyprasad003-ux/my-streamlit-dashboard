@@ -91,5 +91,3 @@ st.dataframe(filtered_df, use_container_width=True)
 
 csv = filtered_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download filtered data as CSV", csv, "filtered.csv", "text/csv")
-
-
