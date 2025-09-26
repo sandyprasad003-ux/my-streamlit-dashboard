@@ -2,267 +2,187 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import base64  # for embedding logo in HTML
 
 # -------------------------------
-# Page Config
+# Page config
 # -------------------------------
-st.set_page_config(page_title="Entod Current-Month Dashboard", layout="wide")
+st.set_page_config(page_title="Entod Pharma Dashboard", layout="wide")
 
 # -------------------------------
-# Red Box Function for Sections
+# Dashboard Title with Logo inside Red Box
 # -------------------------------
-def red_section_box(title):
+try:
+    with open("logo.png", "rb") as f:
+        logo_bytes = f.read()
+    logo_base64 = base64.b64encode(logo_bytes).decode()
     st.markdown(
         f"""
-        <div style="
-            padding: 15px;
-            border-radius: 15px;
-            background-color: #FF0D0D;
-            color: #FFFFFF;
-            text-align: center;
-            font-size: 20px;
-            font-weight: bold;
-            box-shadow: 3px 3px 10px rgba(0,0,0,0.2);
-            margin-bottom: 10px;
-        ">
-            {title}
+        <div style="background-color:#FF0D0D; padding:15px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
+            <img src="data:image/png;base64,{logo_base64}" 
+                 alt="Company Logo" style="height:50px; margin-right:15px;">
+            <h2 style="color:white; margin:0;">Entod Pharma - Current Month to Till Date Dashboard</h2>
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
+    )
+except FileNotFoundError:
+    st.markdown(
+        """
+        <div style="background-color:#FF0D0D; padding:15px; border-radius:10px; text-align:center;">
+            <h2 style="color:white; margin:0;">Entod Pharma - Current Month to Till Date Dashboard</h2>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-# -------------------------------
-# Dashboard Title in Red Box
-# -------------------------------
-st.markdown(
-    f"""
-    <div style="
-        padding: 20px;
-        border-radius: 15px;
-        background-color: #FF0D0D;
-        color: #FFFFFF;
-        text-align: center;
-        font-size: 28px;
-        font-weight: bold;
-        box-shadow: 3px 3px 10px rgba(0,0,0,0.2);
-        margin-bottom: 20px;
-    ">
-        📊 Entod Pharma - Current Month Dashboard
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("<br>", unsafe_allow_html=True)
 
 # -------------------------------
-# Moving Colored Notification Banner (Marquee)
+# Info / Notification Bar (Moving)
 # -------------------------------
 st.markdown(
     """
-    <marquee behavior="scroll" direction="left" scrollamount="6">
-        <div style="
-            padding: 15px;
-            border-radius: 10px;
-            background-color: #FFCC00;
-            color: #000000;
-            font-weight: bold;
-            font-size: 16px;
-            text-align: center;
-            width: 100%;
-        ">
-            ⚠️ This Dashboard is refreshed daily at <b>10 AM</b> and <b>5 PM</b>. 
-            You will only see updated data after these times.
-        </div>
+    <marquee behavior="scroll" direction="left" scrollamount="6"
+             style="background-color:#FFCCCB; color:black; padding:10px; border-radius:8px; font-size:16px;">
+        ⚠️ This Dashboard Is Daily Refreshed at 10 AM and 5 PM. 
+        You will be able to extract new updated data only after these times.
     </marquee>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 # -------------------------------
-# Dark/Light Mode Toggle (entire screen)
-# -------------------------------
-theme_choice = st.sidebar.radio("Choose Theme", ["Light Mode", "Dark Mode"])
-
-if theme_choice == "Dark Mode":
-    st.markdown(
-        """
-        <style>
-        .css-1l02zno {background-color: #1E1E1E;}  
-        .css-18ni7ap, .css-10trblm, .stButton button {color: #FFFFFF;} 
-        .css-1d391kg {background-color: #2E2E2E;}  
-        .stDataFrame {background-color: #2E2E2E; color: #FFFFFF;}
-        .css-1w3fvcr {background-color: #2E2E2E; color: #FFFFFF;}  
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-    bg_color = "#1E1E1E"
-    fg_color = "#FFFFFF"
-else:
-    st.markdown(
-        """
-        <style>
-        .css-1l02zno {background-color: #f0f2f6;}  
-        .css-18ni7ap, .css-10trblm, .stButton button {color: #000000;} 
-        .css-1d391kg {background-color: #FFFFFF;}  
-        .stDataFrame {background-color: #FFFFFF; color: #000000;}
-        .css-1w3fvcr {background-color: #FFFFFF; color: #000000;}  
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-    bg_color = "#f0f2f6"
-    fg_color = "#000000"
-
-# -------------------------------
-# Cached file reading
+# Load Data
 # -------------------------------
 @st.cache_data
-def read_file(file_path):
+def load_data(file_path):
     if file_path.endswith(("xlsx", "xls")):
         return pd.read_excel(file_path, engine="openpyxl")
     else:
         return pd.read_csv(file_path)
 
-# -------------------------------
-# Load Excel file
-# -------------------------------
 file_path = "ALL_DIVISION_DATA_1ST_SEP_24TH_SEP_25_CBO.xlsx"
-df = read_file(file_path)
+df = load_data(file_path)
 
-# Strip spaces from string columns
+# Strip spaces
 for col in df.select_dtypes(include=["object"]):
     df[col] = df[col].astype(str).str.strip()
 
-# Convert object columns to datetime if possible
-for col in df.columns:
-    if df[col].dtype == object:
-        try:
-            df[col] = pd.to_datetime(df[col])
-        except Exception:
-            pass
+# -------------------------------
+# Sidebar Metric Selector (Sales Qty or Sales Amt)
+# -------------------------------
+st.sidebar.header("Select Metric")
+metric_options = [col for col in ["Sales Qty", "Sales Amt"] if col in df.columns]
+selected_metric = st.sidebar.selectbox("Choose metric:", metric_options)
 
 # -------------------------------
-# Sidebar dropdown filters
+# Sidebar Filters for other columns
 # -------------------------------
 st.sidebar.header("Filters")
 filter_values = {}
 for col in df.columns:
-    if pd.api.types.is_datetime64_any_dtype(df[col]):
-        options = sorted(df[col].dt.strftime('%Y-%m-%d').unique())
-        options = ["ALL"] + options
-        selected = st.sidebar.multiselect(f"{col}", options, default=["ALL"])
-        if "ALL" not in selected:
-            selected = pd.to_datetime(selected)
-        else:
-            selected = None
-    else:
+    if col not in ["Sales Qty", "Sales Amt"]:
         options = sorted(df[col].dropna().unique())
         options = ["ALL"] + options
-        selected = st.sidebar.multiselect(f"{col}", options, default=["ALL"])
+        selected = st.sidebar.multiselect(col, options, default=["ALL"])
         if "ALL" not in selected:
-            selected = selected
-        else:
-            selected = None
-    filter_values[col] = selected
+            filter_values[col] = selected
 
 # Apply filters
 filtered_df = df.copy()
 for col, selected in filter_values.items():
-    if selected is not None:
-        filtered_df = filtered_df[filtered_df[col].isin(selected)]
+    filtered_df = filtered_df[filtered_df[col].isin(selected)]
 
 # -------------------------------
-# KPI Cards (Box Style - Red for all)
+# KPI Section (Selected Metric)
 # -------------------------------
-numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
-value_col = st.sidebar.selectbox("Value (numeric)", numeric_cols) if numeric_cols else None
-group_options = df.select_dtypes(include=["object", "category"]).columns.tolist()
-group_col = st.sidebar.selectbox("Group by (categorical)", group_options) if group_options else None
-
-kpi_style = """
-<div style="
-    padding: 20px;
-    margin: 10px;
-    border-radius: 15px;
-    background-color: {bg};
-    color: #FFFFFF;
-    text-align: center;
-    box-shadow: 3px 3px 10px rgba(0,0,0,0.2);
-">
-    <h4>{label}</h4>
-    <h2>{value}</h2>
-</div>
-"""
-
-kpi_bg_color = "#FF0D0D"  # Red color for all KPIs
-
-k1, k2, k3 = st.columns(3)
-k1.markdown(kpi_style.format(bg=kpi_bg_color, label="Rows", value=len(filtered_df)), unsafe_allow_html=True)
-if value_col:
-    k2.markdown(kpi_style.format(bg=kpi_bg_color, label=f"Avg {value_col}", value=round(filtered_df[value_col].mean(),2)), unsafe_allow_html=True)
-    k3.markdown(kpi_style.format(bg=kpi_bg_color, label=f"Sum {value_col}", value=round(filtered_df[value_col].sum(),2)), unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+if selected_metric in filtered_df.columns:
+    total_value = round(filtered_df[selected_metric].sum(), 2)
+    st.markdown(
+        f"""
+        <div style="background-color:#FF0D0D; padding:15px; border-radius:10px; text-align:center;">
+            <h3 style="color:white; margin:0;">Total {selected_metric}</h3>
+            <h2 style="color:white; margin:0;">{total_value}</h2>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
+    st.error(f"⚠️ '{selected_metric}' column not found in dataset.")
 
 # -------------------------------
-# Bar Chart (Top 10 by value)
+# Visualization 1: Top 10 States by Selected Metric
 # -------------------------------
-if group_col and value_col:
-    red_section_box(f"Top 10 {group_col} by {value_col}")  # Section header
-    agg = (
-        filtered_df.groupby(group_col)[value_col]
+if "State Name" in filtered_df.columns and selected_metric in filtered_df.columns:
+    st.markdown("<br>", unsafe_allow_html=True)
+    state_agg = (
+        filtered_df.groupby("State Name")[selected_metric]
         .sum()
         .reset_index()
-        .sort_values(value_col, ascending=False)
+        .sort_values(selected_metric, ascending=False)
         .head(10)
     )
-    fig_bar = px.bar(
-        agg,
-        x=group_col,
-        y=value_col,
-        text=value_col,
-        color_discrete_sequence=["#FF0D0D"]  # Red bars
+    st.markdown(
+        f"""
+        <div style="background-color:#FF0D0D; padding:10px; border-radius:10px; text-align:center;">
+            <h3 style="color:white; margin:0;">Top 10 States by {selected_metric}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    fig_bar.update_layout(plot_bgcolor=bg_color, paper_bgcolor=bg_color, font_color=fg_color)
-    st.plotly_chart(fig_bar, use_container_width=True)
-else:
-    st.info("Select a group and numeric value in the sidebar to see a chart.")
+    fig = px.bar(
+        state_agg,
+        x="State Name",
+        y=selected_metric,
+        title="",
+        color_discrete_sequence=["#FF0D0D"],
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 # -------------------------------
-# Line Chart (trend over datetime)
+# Visualization 2: Top 10 Divisions by Selected Metric
 # -------------------------------
-date_cols = df.select_dtypes(include=["datetime64"]).columns.tolist()
-if date_cols and value_col:
-    date_col = st.sidebar.selectbox("Date for trend", date_cols)
-    trend_df = filtered_df.groupby(date_col)[value_col].sum().reset_index()
-    fig_line = px.line(trend_df, x=date_col, y=value_col, title=f"{value_col} Trend over Time")
-    fig_line.update_layout(plot_bgcolor=bg_color, paper_bgcolor=bg_color, font_color=fg_color)
-    st.plotly_chart(fig_line, use_container_width=True)
+if "Division Name" in filtered_df.columns and selected_metric in filtered_df.columns:
+    st.markdown("<br>", unsafe_allow_html=True)
+    div_agg = (
+        filtered_df.groupby("Division Name")[selected_metric]
+        .sum()
+        .reset_index()
+        .sort_values(selected_metric, ascending=False)
+        .head(10)
+    )
+    st.markdown(
+        f"""
+        <div style="background-color:#FF0D0D; padding:10px; border-radius:10px; text-align:center;">
+            <h3 style="color:white; margin:0;">Top 10 Divisions by {selected_metric}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    fig2 = px.pie(div_agg, values=selected_metric, names="Division Name", hole=0.3)
+    st.plotly_chart(fig2, use_container_width=True)
 
 # -------------------------------
-# Pie Chart (Top 10 Division Proportion) with Red Box
+# Filtered Data Table
 # -------------------------------
-if group_col and value_col:
-    red_section_box(f"Top 10 {group_col} Proportion")  # Red box header
-    pie_df = filtered_df.groupby(group_col)[value_col].sum().reset_index()
-    pie_df = pie_df.sort_values(value_col, ascending=False).head(10)
-    fig_pie = px.pie(pie_df, names=group_col, values=value_col, title=f"Top 10 {group_col} Proportion")
-    fig_pie.update_traces(textinfo='percent+label')
-    fig_pie.update_layout(plot_bgcolor=bg_color, paper_bgcolor=bg_color, font_color=fg_color)
-    st.plotly_chart(fig_pie, use_container_width=True)
-
-# -------------------------------
-# Filtered Data Table with Red Header & 2 Decimal Places
-# -------------------------------
-red_section_box("Filtered Data - All Rows")  # Section header
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <div style="background-color:#FF0D0D; padding:10px; border-radius:10px; text-align:center;">
+        <h3 style="color:white; margin:0;">Filtered Data - All Rows</h3>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Format numeric columns to 2 decimals
-formatted_df = filtered_df.copy()
-for col in formatted_df.select_dtypes(include=["number"]):
-    formatted_df[col] = formatted_df[col].map(lambda x: f"{x:.2f}")
+filtered_display = filtered_df.copy()
+for col in filtered_display.select_dtypes(include=["number"]).columns:
+    filtered_display[col] = filtered_display[col].round(2)
 
-# Style header only for performance
-styled_df = formatted_df.style.set_table_styles([
-    {'selector': 'thead', 'props': [('background-color', '#FF0D0D'), ('color', 'white')]}
-])
+st.dataframe(filtered_display, use_container_width=True, height=400)
 
-st.dataframe(styled_df, use_container_width=True, height=500)
-st.download_button("Download filtered data as CSV", formatted_df.to_csv(index=False).encode("utf-8"), "filtered.csv", "text/csv")
+csv = filtered_display.to_csv(index=False).encode("utf-8")
+st.download_button("Download filtered data as CSV", csv, "filtered.csv", "text/csv")
